@@ -62,7 +62,8 @@ def categorize_variables(df):
 
 def plot_discrete_var(df):
     for col in df.columns:
-        plt.figure(figsize=(5,5))
+        plt.figure(figsize=(15,5))
+        
         sns.countplot(data=df, x=col, palette = "crest")
         plt.title(f"Distribution of {col}")
         plt.ylabel("Count")
