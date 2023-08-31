@@ -62,9 +62,9 @@ def categorize_variables(df):
 
 def plot_discrete_var(df):
     for col in df.columns:
-        plt.figure(figsize=(15,5))
-        
+        plt.figure(figsize=(10,5))
         sns.countplot(data=df, x=col, palette = "crest")
+
         plt.title(f"Distribution of {col}")
         plt.ylabel("Count")
         plt.show()
@@ -78,7 +78,8 @@ def plot_continuous_var(df, bins):
         # Histogram
         # defining subplot 1 
         plt.subplot(1,2,1)
-        sns.histplot(df[col], bins = bins, kde = True)
+        # sns.histplot(df[col], bins = bins, kde = True, hue = "crest")
+        sns.histplot(df[col], bins = bins, kde = True, palette = "crest")
         plt.title(f"Histogram for {col}")
         
         # Boxplot
