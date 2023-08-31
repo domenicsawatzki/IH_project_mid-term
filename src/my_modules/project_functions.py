@@ -4,7 +4,46 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import re # for regular expressions
 from tqdm import tqdm # for progress bar
+from pyproj import Proj, Transformer
+from tqdm import tqdm
+import os # for file system operations
+import geopandas as gpd 
 
+
+
+from PyPDF3 import PdfFileReader # for reading PDF files
+from tabula import read_pdf # for reading PDF files
+
+
+
+# transform to snake_case, lower column names and strip
+def clean_column_names(df):
+    # Input validation
+    if not isinstance(df, pd.DataFrame):
+        raise ValueError("Input df is not a valid DataFrame.")
+    
+    # create copy
+    clean_df = df.copy()
+    
+    #cleaning
+    clean_df.columns= [col.strip() for col in clean_df.columns]
+    clean_df.columns= [col.lower() for col in clean_df.columns]
+    clean_df.columns= [col.replace(' ', '_') for col in clean_df.columns]
+    
+    return clean_df
+
+def change_to_int(x):
+    if isinstance(x, int):
+        return x
+    else: 
+        if x == '0':
+            x = int(0)
+        elif x == '1':
+            x = int(1)
+        else:
+            x = int(0)   
+
+        return x 
 
 def plot_discrete_var(df):
     for col in df.columns:
@@ -45,10 +84,15 @@ def transform_number_under_10(x):
         x = str(x)
         return x
     
+def add_zero_at_beginning(x):
+    if len(x) == 7:
+        return '0' + x
+    return x
+    
 def get_population_data(list): 
     
     column_names = [i for i in range(0, 15)]
-    population_df = pd.DataFrame(columns=column_names)
+    df = pd.DataFrame(columns=column_names)
     
     print(f'Loading all files from ../data/input/population/: {list}')
     
@@ -68,41 +112,296 @@ def get_population_data(list):
 
         # checked with excel the dataset before -> after dropping rows with Nan values the needed information are extracted 
         final_rows = raw_data.dropna().index.tolist()
-        pop_data = raw_data.iloc[final_rows]
+        temp_df = raw_data.iloc[final_rows]
             
         # Add 2 columns year and half_year
-        pop_data.insert(0, 'year', year)
-        pop_data.insert(1, 'half_year', half_year)
+        temp_df.insert(0, 'year', year)
+        temp_df.insert(1, 'half_year', half_year)
         
-        # counter = counter + len(pop_data)
+        # counter = counter + len(temp_df)
             
-        population_df = pd.concat([population_df, pop_data], ignore_index=True , axis=0)
+        df = pd.concat([df, temp_df], ignore_index=True , axis=0)
 
         # Convert columns to integer 
-        columns_to_transform = population_df.columns[0:17]
-        population_df[columns_to_transform] = population_df[columns_to_transform].astype(int)
-        # print(population_df.dtypes)
+        columns_to_transform = df.columns[0:17]
+        df[columns_to_transform] = df[columns_to_transform].astype(int)
+        # print(df.dtypes)
         
         # Transform format for LOR values - (1 -> 01, 2 -> 02 ...)
         for col in [0,1,2,3]:
-            population_df[col] = population_df[col].apply(lambda x: transform_number_under_10(x))
+            df[col] = df[col].apply(lambda x: transform_number_under_10(x))
         
         # drop woman and asyl data columns 
         # transform 0-3 to LOR Code
         # Rearrange table columns    
-        population_df['lor'] = population_df[0] + population_df[1] + population_df[2] + population_df[3]
-        population_df['key'] = population_df['lor'] + '-' + population_df['year'].astype(str) + '-' +  population_df['half_year'].astype(str)
+        df['lor'] = df[0] + df[1] + df[2] + df[3]
+        df['key'] = df['lor'] + '-' + df['year'].astype(str) + '-' +  df['half_year'].astype(str)
     
     # Drop unnecessary columns 
-    population_df = population_df.drop(columns = [0, 1, 2, 3, 13, 14])
+    df = df.drop(columns = [0, 1, 2, 3, 13, 14])
 
     # Reorder and rename columns 
-    population_df = population_df.reindex(['key', 'year', 'half_year', 'lor', 4, 5, 6, 7, 8, 9, 10, 11, 12], axis = 1)
-    population_df.columns = ['key', 'year', 'half_year', 'lor', 'total_population', '-6', '6-15', '15-18', '18-27', '27-45', '45-55', '55-65', '65+']
+    df = df.reindex(['key', 'year', 'half_year', 'lor', 4, 5, 6, 7, 8, 9, 10, 11, 12], axis = 1)
+    df.columns = ['key', 'year', 'half_year', 'lor', 'total_population', '-6', '6-15', '15-18', '18-27', '27-45', '45-55', '55-65', '65+']
 
     # Save the final DataFrame to a pickle file 
-    population_df.to_pickle('../data/output/temp_analysis/total_population_dataset.pkl')
+    df.to_pickle('../data/output/temp_analysis/total_population_dataset.pkl')
     
     print(f'Population data files where successfully loaded, combined and stored as a pickle file. \nPath: ../data/output/temp_analysis/total_population_dataset.pkl ')
     print('Dataframe preview:')
-    return population_df
+    display(df.head(5))
+    return df
+
+#TODO: create a for loop going through all files in../data/input/population
+def get_accident_data():
+    list_accident_files = os.listdir('../data/input/road_accidents/')
+    list_accident_files 
+    
+    print(f'Loading all files from ../data/input/road_accidents/: {list_accident_files}')
+    accidents18 = pd.read_csv('../data/input/road_accidents/berlin_road_accidents_2018.csv', sep=';', encoding = 'latin1')
+    accidents19 = pd.read_csv('../data/input/road_accidents/berlin_road_accidents_2019.csv', sep=';', encoding = 'latin1')
+    accidents20 = pd.read_csv('../data/input/road_accidents/berlin_road_accidents_2020.csv', sep=';', encoding = 'latin1')
+    accidents21 = pd.read_csv('../data/input/road_accidents/berlin_road_accidents_2021.csv', sep=';', encoding = 'latin1')
+
+    accidents18 = clean_column_names(accidents18)
+    accidents19 = clean_column_names(accidents19)
+    accidents20 = clean_column_names(accidents20)
+    accidents21 = clean_column_names(accidents21)
+    
+    # add empty lor_ab_2021 column on accidents19
+    #TODO: cleaning function
+    accidents18.rename(columns={'strzustand':'ustrzustand'}, inplace=True)
+    accidents18.rename(columns={'istsonstig':'istsonstige'}, inplace=True)
+    accidents19.insert(5, 'lor_ab_2021', '')
+    accidents20.insert(4, 'strasse', '')
+    accidents21.insert(3, 'lor', '')
+    accidents21.insert(4, 'strasse', '')
+    
+    final_df = pd.concat([accidents18, accidents19, accidents20, accidents21], axis=0)
+    final_df.shape
+
+    final_df = final_df.drop(columns=['land'])
+    final_df.dtypes
+    
+        
+    final_df = final_df.fillna('0')
+    final_df = final_df.replace("",'0')
+
+    final_df['lor'] = final_df['lor'].astype(float)
+    final_df['lor'] = final_df['lor'].astype('Int64')
+
+    final_df['lor_ab_2021'] = final_df['lor_ab_2021'].astype(float)
+    final_df['lor_ab_2021'] = final_df['lor_ab_2021'].astype('Int64')
+
+    final_df['lor_ab_2021'] = final_df['lor_ab_2021'].astype(float)
+    final_df['lor_ab_2021'] = final_df['lor_ab_2021'].astype('Int64')
+
+
+    final_df['istsonstige'] = final_df['istsonstige'].apply(lambda x: change_to_int(x))
+    final_df['ustrzustand'] = final_df['ustrzustand'].apply(lambda x: change_to_int(x))
+
+    # transform 
+    final_df['linrefx'] = final_df['linrefx'].str.replace(",",'.').astype(float)
+    final_df['linrefy'] = final_df['linrefy'].str.replace(",",'.').astype(float)
+    final_df['xgcswgs84'] = final_df['xgcswgs84'].str.replace(",",'.').astype(float)
+    final_df['ygcswgs84'] = final_df['ygcswgs84'].str.replace(",",'.').astype(float)
+    
+    
+    final_df = final_df.drop(columns=['bez'])
+    
+    # rename columns
+    final_df.columns = ['object_id', 'old_lor','street_default', 'lor', 'year', 'month',
+        'hour', 'weekday', 'ac_category', 'ac_type', 'ac_type2', 'ac_light',
+        'is_bicycle', 'is_car', 'is_pedestrian', 'is_motorcycle', 'is_truck', 'is_other',
+        'street_condition', 'linrefx', 'linrefy', 'xgcswgs84', 'ygcswgs84']
+    
+    key = final_df['object_id'].astype(str) + '-' + final_df['year'].astype(str) + '-' + final_df['lor'].astype(str)
+    final_df.insert(0, 'key', key)
+    
+    #trasnform to bool
+    bool_list = ['is_bicycle', 'is_car', 'is_pedestrian', 'is_motorcycle', 'is_truck', 'is_other']
+    
+    
+    tqdm.pandas()
+    # ETRS89/UTM Zone 32N
+    utm = Proj('epsg:25832')
+
+    # WGS84
+    wgs = Proj('epsg:4326')
+    transformer = Transformer.from_crs('epsg:25832', 'epsg:4326')
+
+    lat, lon = transformer.transform(final_df['linrefx'].tolist(), final_df['linrefy'].tolist())
+
+    final_df['latitude'] = lat
+    final_df['longitude'] = lon
+    
+    for l in bool_list:
+        final_df[l] = final_df[l].astype(bool)
+    
+    # transform to object
+    object_list = ['weekday', 'ac_category', 'ac_type', 'ac_type2', 'ac_light', 'street_condition']
+
+    for l in object_list:
+        final_df[l] = final_df[l].astype('object')
+    
+    # transform to string
+    final_df['lor'] = final_df['lor'].astype(str)
+    final_df['old_lor'] = final_df['old_lor'].astype(str)
+    
+    final_df['lor'] = final_df['lor'].apply(add_zero_at_beginning)
+    final_df['old_lor'] = final_df['old_lor'].apply(add_zero_at_beginning)
+    
+    final_df['district_LOR3'] = final_df['lor'].str[:-2]
+    final_df['district_LOR2'] = final_df['lor'].str[:-4]
+    final_df['district'] = final_df['lor'].str[:-6]
+    
+
+    
+    final_df.to_pickle('../data/output/temp_analysis/accident_dataset.pkl')
+    print(f'Accident data files where successfully loaded, combined and stored as a pickle file. \nPath: ../data/output/temp_analysis/accident_dataset.pkl ')
+    print('Dataframe preview:')
+    display(final_df.head(5))
+    return final_df
+
+
+
+def get_adress_data_by_year(year):
+    path = f'../data/input/berlin_adresses/{year}'
+    
+    list_of_files = os.listdir(path)
+    list_of_files
+    
+    length = len(list_of_files)
+    counter = 0 
+    
+    column_names = [i for i in range(0, 14)]
+    # print(len(column_names))
+    final_df = pd.DataFrame(columns = column_names)
+    
+    print(f'Extracting data from files in {path}')
+    
+    for file_name in (list_of_files):
+        path = f'../data/input/berlin_adresses/{year}/{file_name}'
+        df, name, counter = extract_all_pages_from_pdf(path, file_name, counter, length)
+        
+        # df.to_csv(f'../data/output/temp_adress_data/{name}-{year}.csv', index = False)
+        
+        final_df = pd.concat([final_df, df], ignore_index=True , axis=0)
+    
+    final_df.to_pickle('../data/output/temp_analysis/adress_dataset.pkl')  
+        # display(dataset.head(5))
+        # print(dataset.shape)
+    return final_df
+
+def extract_all_pages_from_pdf(path, file_name, counter, lenght):
+    with open(path, 'rb') as f:
+        # open path as binary / rb = read binary -> used for pdf files
+        counter += 1        
+        pdf = PdfFileReader(f)
+        last_page = pdf.getNumPages()
+        last_page += 1
+
+        # defining page range for import 
+        [i for i in range(0, 15)]
+        page_range = [i for i in range(5, last_page)]
+        # print(page_range)
+
+        # prepare column name filler
+        column_names = [i for i in range(0, 14)]
+        # print(column_names)
+
+        # create empty dataframe
+        adress_data = pd.DataFrame(columns = column_names)
+        # display(adress_data)
+        
+        # extract district information 
+        #TODO: nochmal prüfen und vielleicht optimieren
+        district = [re.findall(r'(?<=adr_)(.*?)(?=_\d{4}\.pdf)', file_name)]
+        print(f'file {counter}/{lenght} - {district[0][0]}')
+        for page in tqdm(page_range):
+            
+            import_data = read_pdf(path, pages = page, encoding = 'ISO-8859-1', stream = True, area = [175, 33, 783, 520], guess = True, pandas_options={'header': None})
+            table_df = import_data[0]
+
+            
+            table_df = import_data[0]
+            columns_len = len(table_df.columns)
+
+            if columns_len < 14:
+                if table_df.iloc[:, 3].dtype in ['int64', 'int32', 'float64', 'float32']:
+                    table_df.insert(3, 'm1', np.nan)
+
+                if table_df.iloc[:, 6].dtype in ['int64', 'int32', 'float64', 'float32']:
+                    table_df.insert(5, 'm2', np.nan)
+                
+                
+                column_length = len(table_df.columns)
+
+                
+                if column_length < 14:
+                    table_df['m3'] = np.nan
+                    # display(table_df)
+                
+                
+                table_df.columns = column_names
+                table_df['14'] = str(district[0][0])
+                
+                adress_data = pd.concat([adress_data, table_df], ignore_index=True , axis=0)
+
+        return adress_data, district[0][0], counter
+    
+def import_geo_data():
+    list_accident_files = os.listdir('../data/input/geo_data/')
+    list_accident_files 
+    print(f'Loading all files from ../data/input/geo_data/: {list_accident_files}')
+    # Planungsebene 
+    path = '../data/input/geo_data/lor_planungsraeume_2021.geojson'
+    with open(path, 'r', encoding='utf-8') as f:
+        gdf_plan = gpd.read_file(f)
+    
+    gdf_plan = gdf_plan.drop(columns =['BEZ','STAND'] )
+    gdf_plan['GROESSE_M2'] = gdf_plan['GROESSE_M2'].apply(lambda x: round(x,2))
+
+    gdf_plan.columns = ['lor_4', 'lor4_name', 'area_in_sqm_lor4', 'geometry_lor4']
+
+    
+    # bezirksebene
+    path = '../data/input/geo_data/lor_bezirksregionen_2021.geojson'
+    with open(path, 'r', encoding='utf-8') as f:
+        gdf_region = gpd.read_file(f)
+
+    gdf_region = gdf_region.drop(columns =['BEZ','STAND', 'GROESSE_m2'])
+    gdf_region.columns = ['lor_3', 'lor_3_name','geometry_lor3']
+
+
+    # prognoseebene
+    path = '../data/input/geo_data/lor_prognoseraeume_2021.geojson'
+    with open(path, 'r', encoding='utf-8') as f:
+        gdf_prognose = gpd.read_file(f)
+    
+    gdf_prognose
+    gdf_prognose = gdf_prognose.drop(columns =['BEZ','STAND', 'GROESSE_M2'])
+    gdf_prognose.columns = ['lor_2', 'lor_2_name','geometry_lor2']
+    
+    # bezirk
+    path = '../data/input/geo_data/lor_ortsteile.geojson'
+    with open(path, 'r', encoding='utf-8') as f:
+        gdf_ort = gpd.read_file(f)
+
+    gdf_ort = gdf_ort.drop(columns=[ 'gml_id', 'spatial_alias','spatial_type', 'FLAECHE_HA',  'OTEIL', 'geometry']) 
+    gdf_ort.columns = ['lor_1', 'lor_1_name']
+
+    gdf_ort['lor_1']= gdf_ort['lor_1'].str[:2] 
+    gdf_ort = gdf_ort.drop_duplicates()
+
+    
+    gdf_total = pd.merge(gdf_plan, gdf_region, left_on = gdf_plan['lor_4'].str[:6], right_on = 'lor_3', how = 'left')
+    gdf_total = pd.merge(gdf_total, gdf_prognose, left_on = gdf_plan['lor_4'].str[:4], right_on = 'lor_2', how = 'left')
+    gdf_total = pd.merge(gdf_total, gdf_ort, left_on = gdf_plan['lor_4'].str[:2], right_on = 'lor_1', how = 'left')
+    
+    gdf_total.to_pickle('../data/output/temp_analysis/gdf_data.pkl')
+    print(f'Geo data files where successfully loaded, combined and stored as a pickle file. \nPath: ../data/output/temp_analysis/gdf_data.pkl ')
+    print('Dataframe preview:')
+    display(gdf_total.head(5))
+    
+    return gdf_total
