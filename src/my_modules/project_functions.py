@@ -437,7 +437,10 @@ def data_wrangling(accident_df, geo_df, population_df):
     population_df = population_df.loc[:,['lor', 'total_population']]
     summary_table = pd.merge(population_df, geo_df, left_on = 'lor', right_on = 'lor_4', how = 'left')
     
-    temp = accident_df.groupby(['lor_x']).agg({'key':pd.Series.nunique, 'distance_to_CC':np.mean}).reset_index()
+    cycle_df = accident_df.loc[accident_df['is_bicycle'] == True]
+    
+    
+    temp = cycle_df.groupby(['lor_x']).agg({'key':pd.Series.nunique, 'distance_to_CC':np.mean}).reset_index()
     temp.columns = ['lor', 'total_accident_per_lor', 'avg_distance_to_CC_per_lor']
     temp['total_accident_per_lor'] = temp['total_accident_per_lor'].astype(int)
 
