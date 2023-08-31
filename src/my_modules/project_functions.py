@@ -8,7 +8,8 @@ from pyproj import Proj, Transformer
 from tqdm import tqdm
 import os # for file system operations
 import geopandas as gpd 
-
+from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsClassifier
 
 
 from PyPDF3 import PdfFileReader # for reading PDF files
@@ -251,9 +252,9 @@ def get_accident_data():
     final_df['lor'] = final_df['lor'].apply(add_zero_at_beginning)
     final_df['old_lor'] = final_df['old_lor'].apply(add_zero_at_beginning)
     
-    final_df['district_LOR3'] = final_df['lor'].str[:-2]
-    final_df['district_LOR2'] = final_df['lor'].str[:-4]
-    final_df['district'] = final_df['lor'].str[:-6]
+    final_df['lor_3'] = final_df['lor'].str[:-2]
+    final_df['lor_2'] = final_df['lor'].str[:-4]
+    final_df['lor_1'] = final_df['lor'].str[:-6]
     
 
     
@@ -405,3 +406,86 @@ def import_geo_data():
     display(gdf_total.head(5))
     
     return gdf_total
+
+def get_distance(row):
+    from geopy.distance import geodesic as GD
+    latitude = row['latitude_x']
+    longitude = row['longitude_x']
+    point = (latitude, longitude)
+    city_center = (52.51916459, 13.405665044)
+    distance = GD(point, city_center).km
+    return distance 
+
+
+
+def data_wrangling(accident_df, geo_df, population_df):
+    accident_df = accident_df.drop(columns = ['street_default', 'is_motorcycle', 'is_truck','is_other', 'linrefx', 'linrefy', 'xgcswgs84','ygcswgs84', 'ac_type2', 'street_condition', 'ac_light', 'object_id'])
+    
+    accident_df['ac_category'] = accident_df['ac_category'].replace({1:'deadly', 2:'seriously_injured', 3:'light_injured' })
+    accident_df['ac_type'] = np.where(accident_df['ac_type'].isin([1, 4, 5, 6, 7, 8, 9, 0]), 'other', 'turn_in')
+    print('Start finalizing accident dataset.')
+    print('Calculating distances to city center for each row:')
+    accident_df['distance_to_CC'] = accident_df.progress_apply(get_distance, axis =1)
+    
+    print(f'Final accident datafile is saved as csv and xslx. \nPath: ../data/output/tableau\n')
+    accident_df.to_csv('../data/output/Tableau/final_accident_data.csv', index=False)
+    accident_df.to_excel('../data/output/Tableau/final_accident_data.xlsx', index=False)   
+
+    print('Start combining geo and population data and create a summary table.')
+    print('Calculating distances to city center for each row:')
+    
+    population_df = population_df.loc[:,['lor', 'total_population']]
+    summary_table = pd.merge(population_df, geo_df, left_on = 'lor', right_on = 'lor_4', how = 'left')
+    
+    temp = accident_df.groupby(['lor_x']).agg({'key':pd.Series.nunique, 'distance_to_CC':np.mean}).reset_index()
+    temp.columns = ['lor', 'total_accident_per_lor', 'avg_distance_to_CC_per_lor']
+    temp['total_accident_per_lor'] = temp['total_accident_per_lor'].astype(int)
+
+    summary_table = pd.merge(summary_table, temp, on = 'lor', how = 'left')
+    summary_table['population_density_per_lor_in_sqkm'] = round(summary_table['total_population'] / summary_table['area_in_sqm_lor4'] * 1000000,0)
+    summary_table['total_accident_per_lor'].fillna(0, inplace=True)
+    
+    summary_table.to_csv('../data/output/Tableau/final_summary_table.csv', index=False)
+    summary_table.to_excel('../data/output/Tableau/final_summary_table.xlsx', index=False)
+    print(f'Final summary table is saved as csv and xslx. \nPath: ../data/output/tableau\n')
+    return accident_df, summary_table
+
+def predict_LOR_values_based_on_lat_lon(raw_df):
+    
+    df = raw_df[['key','lor', 'latitude', 'longitude']]
+
+    df[['lor']] = df[['lor']].astype(str)
+
+    df_model = df.loc[df['lor'] != '0']
+    df_predict = df.loc[df['lor'] == '0']
+
+    X = df_model.drop(columns = ['lor','key'])
+    y = df_model['lor']
+    
+    X_predict = df_predict.drop(columns = ['lor','key'])
+
+    
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=100)
+    
+
+    KNN = KNeighborsClassifier(n_neighbors=2, p=1, weights = 'distance')
+    KNN.fit(X_train, y_train)
+    
+    score = KNN.score(X_test, y_test)
+    print(f'R2 Testscore: {score}')
+
+    score_train = KNN.score(X_train, y_train)
+    print(f'R2 Train: {score_train}')
+    
+    y_predicted = KNN.predict(X_predict)
+    df_predict['lor'] = y_predicted
+    df_predict.drop(columns = ['latitude', 'longitude'])
+    
+    final_df = pd.merge(raw_df, df_predict, on = 'key', how = 'left')
+    final_df.loc[final_df['lor_x'] == '0', 'lor_x'] = final_df['lor_y']
+    final_df.drop(columns = ['latitude_y', 'longitude_y', 'lor_y'], inplace = True)
+    
+
+    
+    return final_df
