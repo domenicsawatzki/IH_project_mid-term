@@ -2,63 +2,9 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import re # for regular expressions
+from tqdm import tqdm # for progress bar
 
-    
-def customerDataCleanAndPrepareForModel(df):
-    import numpy as np
-    df.columns= [col.lower() for col in df.columns]
-    df.columns= [col.replace(' ', '_') for col in df.columns]
-    df.rename(columns={'st':'state'}, inplace=True)
-    df.rename(columns={'monthly_premium_auto':'monthly_premium_costs'}, inplace=True)
-    df.drop(columns=['customer', 'effective_to_date'], axis=1)
-
-    
-    y = df['total_claim_amount']
-    X = df.drop(['total_claim_amount'], axis=1)
-
-    X_num = X.select_dtypes(include = np.number)
-    X_cat = X.select_dtypes(include = object)
-    
-    from sklearn.preprocessing import MinMaxScaler # do not use the function Normalise() - it does something entirely different
-    MinMaxtransformer = MinMaxScaler().fit(X_num)
-    
-    X_normalized = MinMaxtransformer.transform(X_num)
-    X_normalized = pd.DataFrame(X_normalized,columns=X_num.columns)
-
-    
-    from sklearn.preprocessing import OneHotEncoder
-    encoder = OneHotEncoder(drop='first')
-    encoder.fit(X_cat)
-    encoded_X_cat = encoder.transform(X_cat)
-    # Convert the encoded data to a pandas DataFrame
-    encoded_X_cat = pd.DataFrame(encoded_X_cat.toarray(), columns=encoder.get_feature_names_out(X_cat.columns))
-    
-    final_X = pd.concat([X_normalized ,encoded_X_cat], axis=1)
-
-    return final_X, y
-
-def clean_column_names(df):
-    df.columns= [col.lower() for col in df.columns]
-    df.columns= [col.replace(' ', '_') for col in df.columns]
-    df.rename(columns={'st':'state'}, inplace=True)
-    df.rename(columns={'monthly_premium_auto':'monthly_premium_costs'}, inplace=True)
-
-    
-    return df
-
-def categorize_variables(df):
-    continuous_df = pd.DataFrame()
-    discrete_df = pd.DataFrame()
-
-    for column in df.columns:
-        unique_values = df[column].nunique()
-
-        if unique_values > 10:
-            continuous_df[column] = df[column]
-        else:
-            discrete_df[column] = df[column]
-
-    return continuous_df, discrete_df
 
 def plot_discrete_var(df):
     for col in df.columns:
@@ -89,28 +35,67 @@ def plot_continuous_var(df, bins):
         
         plt.tight_layout()
         plt.show()
+
+
+def transform_number_under_10(x):
+    if x < 10:
+        x = '0' + str(x)
+        return x
+    else:
+        x = str(x)
+        return x
+    
+def get_population_data(list): 
+    
+    for filename in tqdm(list): 
+
+    print(f'{filename}')
+    
+    # extract year and half_year from filename
+    temp = re.search(r'(\d{4})h(\d{2})', filename)
+    year, half_year = temp.groups()
+
+    # create file path for file import 
+    file_path = f'../data/input/population/{filename}'
+
+    # import data from 'T2' sheet - checked in Excel 
+    raw_data = pd.read_excel(file_path, 'T2', header = None)
+
+    # checked with excel the dataset before -> after dropping rows with Nan values the needed information are extracted 
+    final_rows = raw_data.dropna().index.tolist()
+    pop_data = raw_data.iloc[final_rows]
         
+    # Add 2 columns year and half_year
+    pop_data.insert(0, 'year', year)
+    pop_data.insert(1, 'half_year', half_year)
+    
+    # counter = counter + len(pop_data)
+        
+    population_df = pd.concat([population_df, pop_data], ignore_index=True , axis=0)
 
-def define_upper_limit(df, col):
-    Q1 = df[col].quantile(0.25)
-    Q3 = df[col].quantile(0.75)
-    IQR = Q3 - Q1
+    # Convert columns to integer 
+    columns_to_transform = population_df.columns[0:17]
+    population_df[columns_to_transform] = population_df[columns_to_transform].astype(int)
+    # print(population_df.dtypes)
+    
+    # Transform format for LOR values - (1 -> 01, 2 -> 02 ...)
+    for col in [0,1,2,3]:
+        population_df[col] = population_df[col].apply(lambda x: transform_number_under_10(x))
+    
+    # drop woman and asyl data columns 
+    # transform 0-3 to LOR Code
+    # Rearrange table columns    
+    population_df['lor'] = population_df[0] + population_df[1] + population_df[2] + population_df[3]
+    population_df['key'] = population_df['lor'] + '-' + population_df['year'].astype(str) + '-' +  population_df['half_year'].astype(str)
+    
+# Drop unnecessary columns 
+population_df = population_df.drop(columns = [0, 1, 2, 3, 13, 14])
 
-    upper_limit = Q3 + (IQR * 1.5)
-    print(f"Upper limit for {col} is {upper_limit.round(2)}.")
-    return upper_limit.round(2)
+# Reorder and rename columns 
+population_df = population_df.reindex(['key', 'year', 'half_year', 'lor', 4, 5, 6, 7, 8, 9, 10, 11, 12], axis = 1)
+population_df.columns = ['key', 'year', 'half_year', 'lor', 'total_population', '-6', '6-15', '15-18', '18-27', '27-45', '45-55', '55-65', '65+']
 
+# Save the final DataFrame to a pickle file 
+population_df.to_pickle('../data/output/temp_analysis/total_population_dataset.pkl')
 
-def check_unique_values(df):
-    columns = df.columns
-
-    for col in columns:
-        print(
-f"""
-Unique Values for column: **{col}** -> Number of unique values: **{df[col].nunique()}**
-{df[col].unique()}
-Valuecounts: 
-{df[col].value_counts()}
-Dtype: {df[col].dtype}
-
-""")
+display(population_df.head(5))
