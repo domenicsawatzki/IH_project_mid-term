@@ -364,7 +364,7 @@ def import_geo_data():
     gdf_plan['GROESSE_M2'] = gdf_plan['GROESSE_M2'].apply(lambda x: round(x,2))
 
     gdf_plan.columns = ['lor_4', 'lor4_name', 'area_in_sqm_lor4', 'geometry_lor4']
-
+    gdf_plan['geometry_lor4'] = gdf_plan['geometry_lor4'].apply(lambda geom: [list(p.exterior.coords) for p in geom.geoms])
     
     # bezirksebene
     path = '../data/input/geo_data/lor_bezirksregionen_2021.geojson'
@@ -373,6 +373,8 @@ def import_geo_data():
 
     gdf_region = gdf_region.drop(columns =['BEZ','STAND', 'GROESSE_m2'])
     gdf_region.columns = ['lor_3', 'lor_3_name','geometry_lor3']
+    
+    
 
 
     # prognoseebene
@@ -383,6 +385,7 @@ def import_geo_data():
     gdf_prognose
     gdf_prognose = gdf_prognose.drop(columns =['BEZ','STAND', 'GROESSE_M2'])
     gdf_prognose.columns = ['lor_2', 'lor_2_name','geometry_lor2']
+    
     
     # bezirk
     path = '../data/input/geo_data/lor_ortsteile.geojson'
