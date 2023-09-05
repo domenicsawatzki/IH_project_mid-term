@@ -11,9 +11,27 @@ This project aims to analyze the relationship between population density, geogra
 
 ## Datasets Used
 
-- Berlin road accident data - https://daten.berlin.de/datensaetze/stra%C3%9Fenverkehrsunf%C3%A4lle-nach-unfallort-berlin-2021
+- Berlin road accident data - https://daten.berlin.de/datensaetze
+    - Amt für Statistik Berlin Brandenburg / [Straßenverkehrsunfälle nach Unfallort in Berlin 2018]
+    - Amt für Statistik Berlin Brandenburg / [Straßenverkehrsunfälle nach Unfallort in Berlin 2019]
+    - Amt für Statistik Berlin Brandenburg / [Straßenverkehrsunfälle nach Unfallort in Berlin 2020]
+    - Amt für Statistik Berlin Brandenburg / [Straßenverkehrsunfälle nach Unfallort in Berlin 2021]
+
 - Berlin population data - https://www.statistik-berlin-brandenburg.de/a-i-16-hj
-- Berlin geographical data - https://daten.odis-berlin.de/
+    - Amt für Statistik Berlin Brandenburg / [A | 16 - hj 2/22]
+
+- Berlin geographical data - https://daten.odis-berlin.de/ 
+    - "Geoportal Berlin / [lor_bezirksregionen_2021]
+    - "Geoportal Berlin / [lor_ortsteile]
+    - "Geoportal Berlin / [lor_planungsraeume_2021]
+    - "Geoportal Berlin / [lor_prognoseraume_2021]
+    - "Geoportal Berlin / [Detailnetz-Strassenabschnitte] - for further analysis
+
+- Berlin geographical data - https://fbinter.stadt-berlin.de/ - didn't use in the final approach 
+    - Senatsverwaltung für Stadtentwicklung, Bauen und Wohnen / [Flächennutzung, Stadtstruktur 2020 und Versiegelung 2021 (Umweltatlas)] 
+
+- Berlin Adress library - https://www.statistik-berlin-brandenburg.de/
+    - Amt für Statistik Berlin Brandenburg / [Adressverzeichnis für die lebensweltlich orientierten Räume Berlin] - for all districts
 
 ### Final Documents
 
@@ -41,7 +59,7 @@ This project aims to analyze the relationship between population density, geogra
     - Data wrangling and exploratory data analysis.
 
 6. `2_model_to_predict_empty_LOR_Values.ipynb`  
-    - Model to predict missing LOR (Location?) values.
+    - Model to predict missing LOR (sub districts) values.
 
 7. `3_hypothesis_testing.ipynb`  
     - Notebook focusing on the hypothesis testing.
@@ -57,15 +75,6 @@ This project aims to analyze the relationship between population density, geogra
 3. `X_urbun_structure_import.ipynb`  
     - Initial approach to importing and investigating urban structure data.
 
-## Requirements
-
-- Python 3.x
-- Jupyter Notebook
-- Pandas
-- NumPy
-- Matplotlib
-- Seaborn
-- GeoPandas
 
 ## How to Run the Project
 
@@ -73,8 +82,12 @@ This project aims to analyze the relationship between population density, geogra
 2. Install the required packages.
 3. Run `main.ipynb`
 
-## Results
+## Data Summary - final presentation 
 
 https://public.tableau.com/app/profile/domenic4547/viz/berlin_cycling_accidents/Story1
+
+## License
+This project is licensed under the Creative Commons Attribution 3.0 Germany (CC BY 3.0 DE) License. For more details, please visit [Creative Commons CC BY 3.0 DE License](https://creativecommons.org/licenses/by/3.0/de/).
+
 
 
